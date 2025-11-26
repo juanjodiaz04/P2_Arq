@@ -1,0 +1,72 @@
+#include <iostream>
+#include <chrono>
+#include <cstdio>
+#include <cuda_runtime.h>
+
+// Grid-stride Loop
+
+__global__
+void partial_prod_stride(int n, float *x, float *y, float *partial){
+    int index  = blockDim.x * blockIdx.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for(int i = index; i < n; i += stride){
+        partial[i] = x[i] * y[i];
+    }
+}
+
+int main() {
+    int N = 1 << 25;
+
+    float *x = new float[N];
+    float *y = new float[N];
+    float *partial = new float[N];
+
+    for(int i=0;i<N;i++){
+        x[i] = 1.0f;
+        y[i] = 2.0f;
+    }
+
+    float *d_x, *d_y, *d_partial;
+    int size = N * sizeof(float);
+
+    cudaMalloc(&d_x, size);
+    cudaMalloc(&d_y, size);
+    cudaMalloc(&d_partial, size);
+
+    cudaMemcpy(d_x, x, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, size, cudaMemcpyHostToDevice);
+
+    int blockSize = 256; // threads per block
+    int numSMs;
+
+    cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+
+    int numBlocks = 32 * numSMs; // total blocks
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+
+    partial_prod_stride<<<numBlocks, blockSize>>>(N, d_x, d_y, d_partial);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(partial, d_partial, size, cudaMemcpyDeviceToHost);
+
+    // Compute sum in CPU
+    double sum = 0.0;
+    for(int i=0;i<N;i++)
+        sum += partial[i];
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> elapsed = t1 - t0;
+
+    std::printf("Result = %f\n", sum);
+    std::printf("Expected = %f\n", 2.0 * N);
+    std::printf("Execution time: %.3f ms\n", elapsed.count());
+
+    delete[] x;
+    delete[] y;
+    delete[] partial;
+    cudaFree(d_x);
+    cudaFree(d_y);
+    cudaFree(d_partial);
+}

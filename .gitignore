@@ -1,0 +1,9 @@
+.vscode/
+
+# Ignore executable files
+Dot_Prod/Test_add/*
+Dot_Prod/Test_dotp/*
+
+# Don't ignore these files
+!Dot_Prod/Test_add/*.cu
+!Dot_Prod/Test_dotp/*.cu
