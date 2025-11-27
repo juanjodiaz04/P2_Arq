@@ -3,7 +3,11 @@
 # Ignore executable files
 Dot_Prod/Test_add/*
 Dot_Prod/Test_dotp/*
+kmeans/*
 
 # Don't ignore these files
 !Dot_Prod/Test_add/*.cu
 !Dot_Prod/Test_dotp/*.cu
+!kmeans/*.c
+!kmeans/*.csv
+!kmeans/*.cu
