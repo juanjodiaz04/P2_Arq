@@ -11,3 +11,5 @@ kmeans/*
 !kmeans/*.c
 !kmeans/*.csv
 !kmeans/*.cu
+!kmeans/*.py
+!kmeans/*.gif
