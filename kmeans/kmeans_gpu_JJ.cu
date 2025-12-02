@@ -117,14 +117,14 @@ void dump_iteration_data(
 
 __global__
 void reset_sums_kernel(float *sum_x, float *sum_y, int *count, int K) {
-    int tid    = threadIdx.x + blockIdx.x * blockDim.x; // global thread ID
-    int stride = blockDim.x * gridDim.x;                // total number of threads
+    // Global thread ID
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    // Grid-stride loop over centroids
-    for (int c = tid; c < K; c += stride) {
-        sum_x[c] = 0.0f;
-        sum_y[c] = 0.0f;
-        count[c] = 0;
+    // Each thread resets one centroid (if it exists)
+    if (tid < K) {
+        sum_x[tid] = 0.0f;
+        sum_y[tid] = 0.0f;
+        count[tid] = 0;
     }
 }
 
