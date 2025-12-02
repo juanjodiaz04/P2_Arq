@@ -23,23 +23,24 @@ void dump_iteration_data(
     int it,
     int K,
     int N,
-    const float *d_cx,
-    const float *d_cy,
+    const float *d_centroids, 
     const int   *d_labels)
 {
-    static float *cx_dump     = NULL;
-    static float *cy_dump     = NULL;
-    static int   *labels_dump = NULL;
+    
+    static float *centroids_dump = NULL; 
+    static int   *labels_dump    = NULL;
 
-    if (cx_dump == NULL) {
-        cx_dump     = (float*)malloc(K * sizeof(float));
-        cy_dump     = (float*)malloc(K * sizeof(float));
+    if (centroids_dump == NULL) {
+        
+        centroids_dump = (float*)malloc(2 * K * sizeof(float));
         labels_dump = (int*)malloc(N * sizeof(int));
     }
 
-    CUDA_CHECK(cudaMemcpy(cx_dump,     d_cx,    K * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(cy_dump,     d_cy,    K * sizeof(float), cudaMemcpyDeviceToHost));
-    CUDA_CHECK(cudaMemcpy(labels_dump, d_labels, N * sizeof(int),  cudaMemcpyDeviceToHost));
+
+    CUDA_CHECK(cudaMemcpy(centroids_dump, d_centroids, 
+                          2 * K * sizeof(float), cudaMemcpyDeviceToHost));
+    
+    CUDA_CHECK(cudaMemcpy(labels_dump, d_labels, N * sizeof(int), cudaMemcpyDeviceToHost));
 
     char fname[256];
     sprintf(fname, "iterations_sim/iteration_%03d.csv", it);
@@ -49,7 +50,8 @@ void dump_iteration_data(
 
     fprintf(f, "# centroids:\n");
     for (int c = 0; c < K; c++)
-        fprintf(f, "C%d,%f,%f\n", c, cx_dump[c], cy_dump[c]);
+        // Indexación para AoS: x está en 2*c, y está en 2*c + 1
+        fprintf(f, "C%d,%f,%f\n", c, centroids_dump[2*c], centroids_dump[2*c + 1]);
 
     fprintf(f, "# labels:\n");
     for (int i = 0; i < N; i++)
@@ -194,14 +196,10 @@ void kmeans_gpu(
             h_centroids[2 * c + 1] = newy;
         }
 
-        CUDA_CHECK(cudaMemcpy(d_centroids, h_centroids,
-                              2 * K * sizeof(float),
-                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_centroids, h_centroids, 2 * K * sizeof(float), cudaMemcpyHostToDevice));
 
         // ----------- DUMP HERE --------------
-        dump_iteration_data(it, K, N,
-                            d_centroids, d_centroids + K,  // cx, cy
-                            d_labels);
+        dump_iteration_data(it, K, N, d_centroids, d_labels);
 
         if (movement < epsilon) break;
     }
