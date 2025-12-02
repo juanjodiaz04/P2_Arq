@@ -3,6 +3,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include <chrono>
 
 #include <cuda_runtime.h>
 
@@ -143,6 +144,9 @@ void kmeans_gpu(
     printf("K-means GPU fused: N=%d, K=%d, blocks=%d, threads=%d\n",
            N, K, numBlocks, blockSize);
 
+    // Time measurement start
+    auto start = std::chrono::high_resolution_clock::now();
+
     for (int it = 0; it < max_iters; ++it) {
 
         // limpiar sum y count en device
@@ -196,6 +200,12 @@ void kmeans_gpu(
             break;
         }
     }
+
+    // Time measurement end
+    auto end =  std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     free(h_sum);
     free(h_count);
