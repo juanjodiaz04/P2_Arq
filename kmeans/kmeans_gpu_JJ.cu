@@ -4,6 +4,7 @@
 #include <float.h>
 #include <string.h>
 #include <cuda_runtime.h>
+#include <chrono>
 
 #define MAX_POINTS 10000000
 
@@ -120,7 +121,7 @@ void reset_sums_kernel(float *sum_x, float *sum_y, int *count, int K) {
     // Global thread ID
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    // Each thread resets one centroid (if it exists)
+    // Each thread resets one centroid
     if (tid < K) {
         sum_x[tid] = 0.0f;
         sum_y[tid] = 0.0f;
@@ -317,7 +318,7 @@ void kmeans_gpu(
     CUDA_CHECK(cudaMemcpy(d_cy, cy_host, K * sizeof(float), cudaMemcpyHostToDevice));
 
     // Kernel launch parameters
-    int threads_points = 256;
+    int threads_points = 128;
     int blocks_points  = (N + threads_points - 1) / threads_points;
     if (blocks_points > 1024) blocks_points = 1024; // reasonable limit
 
@@ -329,6 +330,9 @@ void kmeans_gpu(
 
     printf("K-means GPU: N=%d, K=%d, blocks_points=%d, threads_points=%d\n",
            N, K, blocks_points, threads_points);
+
+    // Time measurement
+    auto start = std::chrono::high_resolution_clock::now();
 
     for (int it = 0; it < max_iters; ++it) {
         // 1) reset sums and counts
@@ -360,7 +364,7 @@ void kmeans_gpu(
         CUDA_CHECK(cudaMemcpy(&movement_host, d_movement, sizeof(float),
                               cudaMemcpyDeviceToHost)); 
 
-        printf("Iter %d - centroid movement = %.6f\n", it, movement_host);
+        //printf("Iter %d - centroid movement = %.6f\n", it, movement_host);
 
 
         // DUMP CURRENT STATE TO FILE
@@ -368,7 +372,7 @@ void kmeans_gpu(
 
 
         if (movement_host < epsilon) {
-            printf("Converged after %d iterations.\n", it);
+            //printf("Converged after %d iterations.\n", it);
             break;
         }
     }
@@ -381,6 +385,12 @@ void kmeans_gpu(
         centroids_host[2 * c]     = cx_host[c];
         centroids_host[2 * c + 1] = cy_host[c];
     }
+
+    // Time measurement end
+    auto end =  std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     // Free
     free(cx_host);
