@@ -1,4 +1,5 @@
 import os
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import imageio
@@ -73,19 +74,16 @@ def plot_frame(points_x, points_y, centroids, labels, title):
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(points_x, points_y, c=labels, s=8, cmap='tab10', alpha=0.75)
 
-    # Plot centroids
-    ax.scatter(centroids[:,0], centroids[:,1],
-               s=200, c='black', marker='X', edgecolor='white', linewidth=1.5)
+    ax.scatter(centroids[:, 0], centroids[:, 1],
+               s=200, c='black', marker='X',
+               edgecolor='white', linewidth=1.5)
 
     ax.set_title(title)
     ax.set_xlim(min(points_x), max(points_x))
     ax.set_ylim(min(points_y), max(points_y))
     fig.tight_layout()
 
-    # Render before converting
     fig.canvas.draw()
-
-    # Convert figure to numpy array
     frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     frame = frame.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close(fig)
@@ -97,14 +95,20 @@ def plot_frame(points_x, points_y, centroids, labels, title):
 # MAIN: Build GIF from iteration CSVs
 # -----------------------------------------------------------
 def main():
+    parser = argparse.ArgumentParser(description="Generate GIF from K-Means iteration CSVs.")
+    parser.add_argument("--csv", default="dataset.csv", help="Path to the original dataset CSV.")
+    parser.add_argument("--iter", default="iterations_opt", help="Folder containing iteration_XXX.csv files.")
+    parser.add_argument("--out", default="kmeans_V1.gif", help="Output GIF filename.")
+
+    args = parser.parse_args()
+
     # Load the dataset
-    points_x, points_y = load_points("dataset.csv")
+    points_x, points_y = load_points(args.csv)
     print(points_x.shape, points_y.shape)
-    print(points_x[:5], points_y[:5])
 
     # Read iteration CSVs
     iteration_files = sorted([
-        f for f in os.listdir("iterations")
+        f for f in os.listdir(args.iter)
         if f.startswith("iteration_") and f.endswith(".csv")
     ])
     print(f"Found {len(iteration_files)} iteration files.")
@@ -112,19 +116,24 @@ def main():
     frames = []
 
     for fname in iteration_files:
-        path = os.path.join("iterations", fname)
+        path = os.path.join(args.iter, fname)
         centroids, labels = load_iteration_csv(path)
 
-        print(f"Iteration {fname}: centroids shape {centroids.shape}, labels shape {labels.shape}")
+        print(f"Iteration {fname}: centroids {centroids.shape}, labels {labels.shape}")
 
         frame = plot_frame(points_x, points_y, centroids, labels, title=f"{fname}")
         frames.append(frame)
 
     # Save GIF
-    imageio.mimsave("kmeans_convergence.gif", frames, fps=2, loop=0)
-    print("GIF saved as kmeans_convergence.gif")
+    imageio.mimsave(args.out, frames, fps=2, loop=0)
+    print(f"GIF saved as {args.out}")
 
 
 # -----------------------------------------------------------
 if __name__ == "__main__":
     main()
+
+# example
+# python gif.py --iter iterations_sim --out kmeans_V1.gif
+# python gif.py --iter iterations_opt --out kmeans_V2.gif
+# python gif.py --iter iterations_opt2 --out kmeans_V3.gif
