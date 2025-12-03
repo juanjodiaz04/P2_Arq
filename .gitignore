@@ -13,3 +13,6 @@ kmeans/*
 !kmeans/*.cu
 !kmeans/*.py
 !kmeans/*.gif
+
+# Ignore another files
+kmeans/dataset2.csv
