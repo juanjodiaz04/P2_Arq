@@ -319,9 +319,10 @@ void kmeans_gpu(
     CUDA_CHECK(cudaMemcpy(d_cy, cy_host, K * sizeof(float), cudaMemcpyHostToDevice));
 
     // Kernel launch parameters
-    int threads_points = 256;
-    int blocks_points  = (N + threads_points - 1) / threads_points;
-    if (blocks_points > 1024) blocks_points = 1024; // reasonable limit
+    int threads_points = 256;   // Number of threads for the assign+reduce kernel
+    int numSms;
+    CUDA_CHECK(cudaDeviceGetAttribute(&numSms, cudaDevAttrMultiProcessorCount, 0));
+    int blocks_points = 32* numSms; // Number of blocks for the assign+reduce kernel
 
     int threads_clusters = 128;
     int blocks_clusters  = 1; // K between 1 and 128
