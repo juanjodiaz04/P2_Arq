@@ -282,18 +282,11 @@ void kmeans_gpu(
         CUDA_CHECK(cudaMemset(d_count, 0, K*sizeof(int)));
 
         // Fused assign and reduce kernel
-        assign_reduce_kernel<<<blocks_points, threads_points, shared_fused>>>(
-            d_x, d_y, d_cx, d_cy, d_labels,
-            d_sum_x, d_sum_y, d_count,
-            N, K);
+        assign_reduce_kernel<<<blocks_points, threads_points, shared_fused>>>(d_x, d_y, d_cx, d_cy, d_labels, d_sum_x, d_sum_y, d_count, N, K);
         CUDA_CHECK(cudaDeviceSynchronize());
 
         // Update centroids and compute movement
-        update_centroids_kernel<<<blocks_clusters, threads_clusters>>>(
-            d_cx, d_cy,
-            d_sum_x, d_sum_y,
-            d_count, d_movement,
-            K);
+        update_centroids_kernel<<<blocks_clusters, threads_clusters>>>(d_cx, d_cy, d_sum_x, d_sum_y, d_count, d_movement,K);
         CUDA_CHECK(cudaDeviceSynchronize());
 
         float movement_host = 0;
