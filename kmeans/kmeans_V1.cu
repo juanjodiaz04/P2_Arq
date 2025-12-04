@@ -37,9 +37,7 @@ void dump_iteration_data(
     }
 
 
-    CUDA_CHECK(cudaMemcpy(centroids_dump, d_centroids, 
-                          2 * K * sizeof(float), cudaMemcpyDeviceToHost));
-    
+    CUDA_CHECK(cudaMemcpy(centroids_dump, d_centroids, 2 * K * sizeof(float), cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(labels_dump, d_labels, N * sizeof(int), cudaMemcpyDeviceToHost));
 
     char fname[256];
@@ -168,8 +166,7 @@ void kmeans_gpu(
         CUDA_CHECK(cudaMemset(d_sum,   0, 2 * K * sizeof(float)));
         CUDA_CHECK(cudaMemset(d_count, 0,     K * sizeof(int)));
 
-        assign_and_accumulate_kernel<<<numBlocks, blockSize>>>(
-            d_points, d_centroids, d_labels, d_sum, d_count, N, K);
+        assign_and_accumulate_kernel<<<numBlocks, blockSize>>>(d_points, d_centroids, d_labels, d_sum, d_count, N, K);
         CUDA_CHECK(cudaDeviceSynchronize());
 
         CUDA_CHECK(cudaMemcpy(h_sum,   d_sum,   2 * K * sizeof(float), cudaMemcpyDeviceToHost));
@@ -198,8 +195,8 @@ void kmeans_gpu(
 
         CUDA_CHECK(cudaMemcpy(d_centroids, h_centroids, 2 * K * sizeof(float), cudaMemcpyHostToDevice));
 
-        // ----------- DUMP HERE --------------
-        dump_iteration_data(it, K, N, d_centroids, d_labels);
+        //DUMP CURRENT STATE TO FILE
+        //dump_iteration_data(it, K, N, d_centroids, d_labels);
 
         if (movement < epsilon) break;
     }

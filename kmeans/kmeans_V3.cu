@@ -257,15 +257,15 @@ void kmeans_gpu(
     CUDA_CHECK(cudaMemcpy(d_cx, cx_host, K*sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_cy, cy_host, K*sizeof(float), cudaMemcpyHostToDevice));
 
-    int threads_points = 64;
-    int blocks_points  = (N + threads_points - 1) / threads_points;
-    if (blocks_points > 1024) blocks_points = 1024;
+    int threads_points = 256;   // Number of threads for the assign+reduce kernel
+    int numSms;
+    CUDA_CHECK(cudaDeviceGetAttribute(&numSms, cudaDevAttrMultiProcessorCount, 0));
+    int blocks_points = 32* numSms; // Number of blocks for the assign+reduce kernel
 
-    int threads_clusters = 64;
-    int blocks_clusters = 1;
+    int threads_clusters = 64;      // Number of threads for the update centroids kernel
+    int blocks_clusters = 1;        // Number of blocks for the update centroids kernel
 
-    size_t shared_fused =
-        (5 * K) * sizeof(float); // cx, cy, sum_x_b, sum_y_b, count_b
+    size_t shared_fused = (5 * K) * sizeof(float); // cx, cy, sum_x_b, sum_y_b, count_b
 
     printf("K-means GPU fused: N=%d, K=%d\n", N, K);
 
@@ -297,13 +297,16 @@ void kmeans_gpu(
         CUDA_CHECK(cudaDeviceSynchronize());
 
         float movement_host = 0;
-        CUDA_CHECK(cudaMemcpy(&movement_host, d_movement,
-                              sizeof(float), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(&movement_host, d_movement, sizeof(float), cudaMemcpyDeviceToHost));
 
-        dump_iteration_data(it, K, N, d_cx, d_cy, d_labels);
+        //dump_iteration_data(it, K, N, d_cx, d_cy, d_labels);
 
         if (movement_host < epsilon) break;
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double,std::milli>(end-start).count();
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     // copy centroids back
     CUDA_CHECK(cudaMemcpy(cx_host, d_cx, K*sizeof(float), cudaMemcpyDeviceToHost));
@@ -314,9 +317,6 @@ void kmeans_gpu(
         centroids_host[2*c + 1] = cy_host[c];
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    double elapsed = std::chrono::duration<double,std::milli>(end-start).count();
-    printf("Elapsed time: %.3f ms\n", elapsed);
 }
 
 

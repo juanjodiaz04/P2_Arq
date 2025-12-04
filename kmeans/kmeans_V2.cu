@@ -319,7 +319,7 @@ void kmeans_gpu(
     CUDA_CHECK(cudaMemcpy(d_cy, cy_host, K * sizeof(float), cudaMemcpyHostToDevice));
 
     // Kernel launch parameters
-    int threads_points = 64;
+    int threads_points = 256;
     int blocks_points  = (N + threads_points - 1) / threads_points;
     if (blocks_points > 1024) blocks_points = 1024; // reasonable limit
 
@@ -329,8 +329,7 @@ void kmeans_gpu(
     size_t shared_assign  = 2 * K * sizeof(float);                   // cx_s, cy_s
     size_t shared_reduce  = 2 * K * sizeof(float) + K * sizeof(int); // sum_x_b, sum_y_b, count_b
 
-    printf("K-means GPU: N=%d, K=%d, blocks_points=%d, threads_points=%d\n",
-           N, K, blocks_points, threads_points);
+    printf("K-means GPU: N=%d, K=%d, blocks_points=%d, threads_points=%d\n", N, K, blocks_points, threads_points);
 
     // Time measurement
     auto start = std::chrono::high_resolution_clock::now();
@@ -344,32 +343,28 @@ void kmeans_gpu(
         CUDA_CHECK(cudaMemset(d_movement, 0, sizeof(float)));
 
         // 3) assign clusters (use shared memory for centroids)
-        assign_clusters_kernel<<<blocks_points, threads_points, shared_assign>>>(
-            d_x, d_y, d_cx, d_cy, d_labels, N, K);
+        assign_clusters_kernel<<<blocks_points, threads_points, shared_assign>>>(d_x, d_y, d_cx, d_cy, d_labels, N, K);
         CUDA_CHECK(cudaGetLastError());
 
         // 4) block-wise reduction with atomics
-        reduce_centroids_kernel<<<blocks_points, threads_points, shared_reduce>>>(
-            d_x, d_y, d_labels, d_sum_x, d_sum_y, d_count, N, K);
+        reduce_centroids_kernel<<<blocks_points, threads_points, shared_reduce>>>(d_x, d_y, d_labels, d_sum_x, d_sum_y, d_count, N, K);
         CUDA_CHECK(cudaGetLastError());
 
         // 5) update centroids and accumulate movement
-        update_centroids_kernel<<<blocks_clusters, threads_clusters>>>(
-            d_cx, d_cy, d_sum_x, d_sum_y, d_count, d_movement, K);
+        update_centroids_kernel<<<blocks_clusters, threads_clusters>>>(d_cx, d_cy, d_sum_x, d_sum_y, d_count, d_movement, K);
         CUDA_CHECK(cudaGetLastError());
 
         CUDA_CHECK(cudaDeviceSynchronize()); // Wait for all kernels to finish
 
         // Copy movement to host
         float movement_host = 0.0f;
-        CUDA_CHECK(cudaMemcpy(&movement_host, d_movement, sizeof(float),
-                              cudaMemcpyDeviceToHost)); 
+        CUDA_CHECK(cudaMemcpy(&movement_host, d_movement, sizeof(float), cudaMemcpyDeviceToHost)); 
 
         //printf("Iter %d - centroid movement = %.6f\n", it, movement_host);
 
 
         // DUMP CURRENT STATE TO FILE
-        dump_iteration_data(it, K, N, d_cx, d_cy, d_labels);
+        //dump_iteration_data(it, K, N, d_cx, d_cy, d_labels);
 
 
         if (movement_host < epsilon) {
@@ -377,6 +372,12 @@ void kmeans_gpu(
             break;
         }
     }
+
+    // Time measurement end
+    auto end =  std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     // Copy final centroids back to host
     CUDA_CHECK(cudaMemcpy(cx_host, d_cx, K * sizeof(float), cudaMemcpyDeviceToHost));
@@ -386,12 +387,6 @@ void kmeans_gpu(
         centroids_host[2 * c]     = cx_host[c];
         centroids_host[2 * c + 1] = cy_host[c];
     }
-
-    // Time measurement end
-    auto end =  std::chrono::high_resolution_clock::now();
-    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
-
-    printf("Elapsed time: %.3f ms\n", elapsed);
 
     // Free
     free(cx_host);
