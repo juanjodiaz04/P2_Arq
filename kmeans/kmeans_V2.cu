@@ -129,7 +129,7 @@ void reset_sums_kernel(float *sum_x, float *sum_y, int *count, int K) {
     }
 }
 
-// Kernel 2: assign each point to the nearest centroid (1 point per thread)
+// Kernel 2: assign each point to the nearest centroid "(1 point per thread)" → Grid - Stride Loop
 // Uses:
 //  - SoA: x[i], y[i]
 //  - centroids in shared memory
@@ -319,12 +319,12 @@ void kmeans_gpu(
     CUDA_CHECK(cudaMemcpy(d_cy, cy_host, K * sizeof(float), cudaMemcpyHostToDevice));
 
     // Kernel launch parameters
-    int threads_points = 256;   // Number of threads for the assign+reduce kernel
+    int threads_points = 512;   // Number of threads for the assign+reduce kernel
     int numSms;
     CUDA_CHECK(cudaDeviceGetAttribute(&numSms, cudaDevAttrMultiProcessorCount, 0));
     int blocks_points = 32* numSms; // Number of blocks for the assign+reduce kernel
 
-    int threads_clusters = 128;
+    int threads_clusters = 64;
     int blocks_clusters  = 1; // K between 1 and 128
 
     size_t shared_assign  = 2 * K * sizeof(float);                   // cx_s, cy_s
@@ -332,8 +332,8 @@ void kmeans_gpu(
 
     printf("K-means GPU: N=%d, K=%d, blocks_points=%d, threads_points=%d\n", N, K, blocks_points, threads_points);
 
-    // Time measurement
-    auto start = std::chrono::high_resolution_clock::now();
+    // Kernel execution timing
+    auto start_kernel = std::chrono::high_resolution_clock::now();
 
     for (int it = 0; it < max_iters; ++it) {
         // 1) reset sums and counts
@@ -374,11 +374,10 @@ void kmeans_gpu(
         }
     }
 
-    // Time measurement end
-    auto end =  std::chrono::high_resolution_clock::now();
-    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
-
-    printf("Elapsed time: %.3f ms\n", elapsed);
+    // Kernel end timing
+    auto end_kernel = std::chrono::high_resolution_clock::now();
+    double elapsed_kernel = std::chrono::duration<double, std::milli>(end_kernel - start_kernel).count();
+    printf("Elapsed time kernel: %.3f ms\n", elapsed_kernel);
 
     // Copy final centroids back to host
     CUDA_CHECK(cudaMemcpy(cx_host, d_cx, K * sizeof(float), cudaMemcpyDeviceToHost));
@@ -427,7 +426,15 @@ int main(int argc, char **argv) {
     int   max_iters = 50;
     float epsilon   = 1e-4f;
 
+    // Time measurement
+    auto start = std::chrono::high_resolution_clock::now();
+
     kmeans_gpu(x, y, centroids, N, K, max_iters, epsilon);
+
+    // Time measurement end
+    auto end =  std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     printf("\nFinal centroids (GPU):\n");
     for (int c = 0; c < K; ++c) {

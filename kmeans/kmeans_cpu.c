@@ -3,6 +3,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_POINTS 10000000 // maximum number of points allowed
 
@@ -145,7 +146,7 @@ void kmeans_cpu(
         assign_clusters_cpu(points, centroids, labels, N, K);
         float movement = update_centroids_cpu(points, centroids, labels, N, K);
 
-        printf("Iteration %d - centroid movement = %.6f\n", it, movement);
+        //printf("Iteration %d - centroid movement = %.6f\n", it, movement);
 
         if (movement < epsilon)
         {
@@ -179,7 +180,15 @@ int main(int argc, char **argv)
     int max_iters = 10;
     float ep = 1e-4f;
 
+    // Measure execution time in CPU
+    clock_t start = clock();
+    
     kmeans_cpu(points, centroids, N, K, max_iters, ep);
+
+    // End timing
+    clock_t end = clock();
+    double elapsed = ((double)(end - start)) / CLOCKS_PER_SEC * 1000.0;
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     printf("\nFinal centroids:\n");
     for (int c = 0; c < K; c++)

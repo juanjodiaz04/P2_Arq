@@ -16,3 +16,4 @@ kmeans/*
 
 # Ignore another files
 kmeans/dataset2.csv
+kmeans/dataset_blobs.csv

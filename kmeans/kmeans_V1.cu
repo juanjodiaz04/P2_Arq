@@ -152,14 +152,15 @@ void kmeans_gpu(
     float *h_sum   = (float*)malloc(2 * K * sizeof(float));
     int   *h_count = (int*)malloc(K * sizeof(int));
 
-    int blockSize = 256;
+    int blockSize = 512;
     int numSMs;
     CUDA_CHECK(cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0));
     int numBlocks = 32 * numSMs;
 
     printf("K-means GPU (1 kernel): N=%d, K=%d\n", N, K);
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // Kernel execution timing
+    auto start_kernel = std::chrono::high_resolution_clock::now();
 
     for (int it = 0; it < max_iters; ++it) {
 
@@ -201,9 +202,10 @@ void kmeans_gpu(
         if (movement < epsilon) break;
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
-    printf("Elapsed time: %.3f ms\n", elapsed);
+    // Kernel end timing
+    auto end_kernel = std::chrono::high_resolution_clock::now();
+    double elapsed_kernel = std::chrono::duration<double, std::milli>(end_kernel - start_kernel).count();
+    printf("Elapsed time kernel: %.3f ms\n", elapsed_kernel);
 
     free(h_sum);
     free(h_count);
@@ -226,7 +228,15 @@ int main(int argc, char **argv) {
     int K = 3;
     float centroids[6] = {0.0f, 0.0f, 5.0f, 5.0f, 10.0f, 10.0f};
 
+    // Measure execution time in GPU
+    auto start = std::chrono::high_resolution_clock::now();
+
     kmeans_gpu(points, centroids, N, K, 50, 1e-4);
+
+    // End timing
+    auto end = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+    printf("Elapsed time: %.3f ms\n", elapsed);
 
     printf("\nFinal centroids:\n");
     for (int c = 0; c < K; ++c)
