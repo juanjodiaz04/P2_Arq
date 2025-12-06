@@ -3,6 +3,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include <time.h>
 #include <cuda_runtime.h>
 #include <chrono>
 
@@ -365,7 +366,7 @@ void kmeans_gpu(
 
 
         // DUMP CURRENT STATE TO FILE
-        //dump_iteration_data(it, K, N, d_cx, d_cy, d_labels);
+        dump_iteration_data(it, K, N, d_cx, d_cy, d_labels);
 
 
         if (movement_host < epsilon) {
@@ -406,8 +407,11 @@ void kmeans_gpu(
 //------------------------------- MAIN --------------------------------
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        printf("Usage: %s data.csv\n", argv[0]);
+    if (argc < 3) {
+        printf("Usage: %s data.csv K [seed]\n", argv[0]);
+        printf("  data.csv: input CSV file with points\n");
+        printf("  K: number of clusters\n");
+        printf("  seed (optional): random seed for centroid initialization\n");
         return 1;
     }
 
@@ -418,8 +422,46 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int K = 3;
-    float centroids[6] = {0.0f, 0.0f, 5.0f, 5.0f, 10.0f, 10.0f};
+    // Read K from command line
+    int K = atoi(argv[2]);
+    if (K <= 0) {
+        printf("Error: K must be positive\n");
+        free(x);
+        free(y);
+        return 1;
+    }
+
+    // Read seed (optional, default = current time)
+    unsigned int seed = (argc >= 4) ? (unsigned int)atoi(argv[3]) : (unsigned int)time(NULL);
+    srand(seed);
+    printf("Using random seed: %u\n", seed);
+
+    // Find min/max of data points to initialize centroids within range
+    float min_x = x[0], max_x = x[0];
+    float min_y = y[0], max_y = y[0];
+    for (int i = 1; i < N; ++i) {
+        if (x[i] < min_x) min_x = x[i];
+        if (x[i] > max_x) max_x = x[i];
+        if (y[i] < min_y) min_y = y[i];
+        if (y[i] > max_y) max_y = y[i];
+    }
+
+    // Generate random centroids within data range
+    float *centroids = (float*)malloc(2 * K * sizeof(float));
+    if (!centroids) {
+        printf("Error allocating centroids\n");
+        free(x);
+        free(y);
+        return 1;
+    }
+
+    printf("Initializing %d random centroids in range [%.2f, %.2f] x [%.2f, %.2f]\n",
+           K, min_x, max_x, min_y, max_y);
+    
+    for (int c = 0; c < K; ++c) {
+        centroids[2 * c]     = min_x + (max_x - min_x) * ((float)rand() / RAND_MAX);
+        centroids[2 * c + 1] = min_y + (max_y - min_y) * ((float)rand() / RAND_MAX);
+    }
 
     printf("Loaded %d points.\n", N);
 
@@ -441,6 +483,7 @@ int main(int argc, char **argv) {
         printf("C%d = (%f, %f)\n", c, centroids[2 * c], centroids[2 * c + 1]);
     }
 
+    free(centroids);
     free(x);
     free(y);
 
